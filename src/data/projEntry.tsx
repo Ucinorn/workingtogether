@@ -1,5 +1,6 @@
 import Node from "components/Node.vue";
 import Spacer from "components/layout/Spacer.vue";
+import Column from "components/layout/Column.vue"
 import { createResource, trackBest, trackOOMPS, trackTotal } from "features/resources/resource";
 import { branchedResetPropagation, createTree, Tree } from "features/trees/tree";
 import type { Layer } from "game/layers";
@@ -11,6 +12,7 @@ import Decimal, { format, formatTime } from "util/bignum";
 import { render } from "util/vue";
 import { computed, toRaw } from "vue";
 import prestige from "./layers/prestige";
+import board from "./layers/board";
 
 /**
  * @hidden
@@ -31,7 +33,18 @@ export const main = createLayer("main", layer => {
     const oomps = trackOOMPS(points, pointGain);
 
     // Note: Casting as generic tree to avoid recursive type definitions
-    const tree = createTree(() => ({
+    const left = createTree(() => ({
+        nodes: noPersist([[prestige.treeNode]]),
+        branches: [],
+        onReset() {
+            points.value = toRaw(tree.resettingNode.value) === toRaw(prestige.treeNode) ? 0 : 10;
+            best.value = points.value;
+            total.value = points.value;
+        },
+        resetPropagation: branchedResetPropagation
+    })) as Tree;
+    // Note: Casting as generic tree to avoid recursive type definitions
+    const right = createTree(() => ({
         nodes: noPersist([[prestige.treeNode]]),
         branches: [],
         onReset() {
@@ -47,7 +60,7 @@ export const main = createLayer("main", layer => {
     // Officially all you need are anything with persistency or that you want to access elsewhere
     return {
         name: "Tree",
-        links: tree.links,
+        links: left.links,
         display: () => (
             <>
                 {player.devSpeed === 0 ? (
@@ -80,14 +93,20 @@ export const main = createLayer("main", layer => {
                     </div>
                 ) : null}
                 <Spacer />
-                {render(tree)}
+                <Column>
+                {render(left)}
+                </Column>
+                <Column>
+                {render(right)}
+                </Column>
             </>
         ),
         points,
         best,
         total,
         oomps,
-        tree
+        left, 
+        right
     };
 });
 
